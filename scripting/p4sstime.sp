@@ -8,6 +8,7 @@
 #include <vector>
 #include <clientprefs>
 #include <sdktools_functions>
+#include <sdktools_entinput>
 
 #pragma semicolon 1    // required for logs.tf
 #pragma newdecls required
@@ -24,11 +25,11 @@
 
 enum
 {
-    COLOR_FORMAT_LENGTH        = 7,
-    MAX_TEAMFORMAT_NAME_LENGTH = COLOR_FORMAT_LENGTH + MAX_NAME_LENGTH,
-    MAX_ENTITIES               = 4096,
-    GOALIE_DISTANCE            = 200,    // hu
-    GOAL_HEAL_HEIGHT           = 330     // hu
+  COLOR_FORMAT_LENGTH        = 7,
+  MAX_TEAMFORMAT_NAME_LENGTH = COLOR_FORMAT_LENGTH + MAX_NAME_LENGTH,
+  MAX_ENTITIES               = 4096,
+  GOALIE_DISTANCE            = 200,  // hu
+  GOAL_HEAL_HEIGHT           = 330,  // hu
 }
 
 #define GOAL_HEAL_RADIUS     500.0                                    // hu
@@ -94,6 +95,7 @@ ConVar          bMedicArrowsNeutralizeBall;
 ConVar          bMedicArrowsPushBall;
 ConVar          bAllowInstantResupply;
 ConVar          flInstantResupplyTimeBetween;
+ConVar          cvNoSplashTime;
 ConVar          flGoalHeal;
 
 // int  			trikzProjCollideCurVal;
@@ -198,23 +200,24 @@ public void OnPluginStart()
     HookEntityOutput("info_passtime_ball_spawn", "OnSpawnBall", Hook_OnSpawnBall);
     AddCommandListener(OnChangeClass, "joinclass");
 
-    bEquipStockWeapons           = CreateConVar("sm_pt_stock_blocklist", "0", "If 1, disable ability to equip shotgun, stickies, and needles; this is needed as allowlists can't normally block stock weapons.", FCVAR_NOTIFY);
-    bSwitchDuringRespawn         = CreateConVar("sm_pt_block_instant_respawn", "0", "If 1, disable class switch ability while dead to instantly respawn.", FCVAR_NOTIFY);
-    bStealBlurryOverlay          = CreateConVar("sm_pt_disable_intercept_blur", "1", "If 1, disable blurry screen overlay after intercepting or stealing.", FCVAR_NOTIFY);
-    bDroppedItemsCollision       = CreateConVar("sm_pt_disable_jack_drop_item_collision", "1", "If 1, disables the jack colliding with dropped ammo packs or weapons.", FCVAR_NOTIFY);
-    bPrintStats                  = CreateConVar("sm_pt_print_events", "0", "If 1, enables printing of passtime events to chat both during and after games. Does not affect logging.", FCVAR_NOTIFY);
-    bFunStats                    = CreateConVar("sm_pt_print_events_fun", "0", "If sm_pt_print_events is 1, print additional fun stats, like stealing a goal from a teammate.", FCVAR_NOTIFY);
-    bPracticeMode                = CreateConVar("sm_pt_practice", "0", "If 1, enables practice mode. When the round timer reaches 5 minutes, add 5 minutes to the timer.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
-    bWinstratKills               = CreateConVar("sm_pt_winstrat_kills", "0", "If 1, kills winstratters and prints \"tried to winstrat\" in chat.", FCVAR_NOTIFY);
-    bVerboseLogs                 = CreateConVar("sm_pt_logs_verbose", "0", "If 1, prints additional information to logs.");
-    bMedicArrowsNeutralizeBall   = CreateConVar("sm_pt_medic_can_splash", "1", "If 1, allows medic crossbow arrows to neutralize the ball.", FCVAR_NOTIFY);
-    bAllowInstantResupply        = CreateConVar("sm_pt_allow_instant_resupply", "0", "If 1, allows sm_pt_resupply.", FCVAR_NOTIFY);
-    bMedicArrowsPushBall         = CreateConVar("sm_pt_medic_splash_pushes_ball", "1", "If 1 along with sm_pt_medic_can_splash, allows medic crossbow arrows to push the ball", FCVAR_NOTIFY);
-    flGoalHeal                   = CreateConVar("sm_pt_goal_heal", "0", "How much health the goal should heal per goal heal tick. There are two ticks per second.", FCVAR_NOTIFY);
-    flInstantResupplyTimeBetween = CreateConVar("sm_pt_instant_resupply_time_between", "0.5", "The number of seconds between each successful sm_pt_resupply.", FCVAR_NOTIFY);
-    // trikzEnable	 = CreateConVar("sm_pt_trikz", "0", "Set 'trikz' mode. 1 adds friendly knockback for airshots, 2 adds friendly knockback for splash damage, 3 adds friendly knockback for everywhere", FCVAR_NOTIFY, true, 0.0, true, 3.0);
-    // trikzProjCollide = CreateConVar("sm_pt_trikz_projcollide", "2", "Manually set team projectile collision behavior when trikz is on. 2 always collides, 1 will cause your projectiles to phase through if you are too close (default game behavior), 0 will cause them to never collide.", 0, true, 0.0, true, 2.0);
-    // trikzProjDev = CreateConVar("sm_pt_trikz_projcollide_dev", "0", "DONOTUSE; This command is used solely by the plugin to change values. Changing this manually may cause issues.", FCVAR_HIDDEN, true, 0.0, true, 2.0);
+  bEquipStockWeapons           = CreateConVar("sm_pt_stock_blocklist", "0", "If 1, disable ability to equip shotgun, stickies, and needles; this is needed as allowlists can't normally block stock weapons.", FCVAR_NOTIFY);
+  bSwitchDuringRespawn         = CreateConVar("sm_pt_block_instant_respawn", "0", "If 1, disable class switch ability while dead to instantly respawn.", FCVAR_NOTIFY);
+  bStealBlurryOverlay          = CreateConVar("sm_pt_disable_intercept_blur", "1", "If 1, disable blurry screen overlay after intercepting or stealing.", FCVAR_NOTIFY);
+  bDroppedItemsCollision       = CreateConVar("sm_pt_disable_jack_drop_item_collision", "1", "If 1, disables the jack colliding with dropped ammo packs or weapons.", FCVAR_NOTIFY);
+  bPrintStats                  = CreateConVar("sm_pt_print_events", "0", "If 1, enables printing of passtime events to chat both during and after games. Does not affect logging.", FCVAR_NOTIFY);
+  bFunStats                    = CreateConVar("sm_pt_print_events_fun", "0", "If sm_pt_print_events is 1, print additional fun stats, like stealing a goal from a teammate.", FCVAR_NOTIFY);
+  bPracticeMode                = CreateConVar("sm_pt_practice", "0", "If 1, enables practice mode. When the round timer reaches 5 minutes, add 5 minutes to the timer.", FCVAR_NOTIFY, true, 0.0, true, 1.0);
+  bWinstratKills               = CreateConVar("sm_pt_winstrat_kills", "0", "If 1, kills winstratters and prints \"tried to winstrat\" in chat.", FCVAR_NOTIFY);
+  bVerboseLogs                 = CreateConVar("sm_pt_logs_verbose", "0", "If 1, prints additional information to logs.");
+  bMedicArrowsNeutralizeBall   = CreateConVar("sm_pt_medic_can_splash", "1", "If 1, allows medic crossbow arrows to neutralize the ball.", FCVAR_NOTIFY);
+  bAllowInstantResupply        = CreateConVar("sm_pt_allow_instant_resupply", "0", "If 1, allows sm_pt_resupply.", FCVAR_NOTIFY);
+  bMedicArrowsPushBall         = CreateConVar("sm_pt_medic_splash_pushes_ball", "1", "If 1 along with sm_pt_medic_can_splash, allows medic crossbow arrows to push the ball", FCVAR_NOTIFY);
+  flGoalHeal                   = CreateConVar("sm_pt_goal_heal", "0", "How much health the goal should heal per goal heal tick. There are two ticks per second.", FCVAR_NOTIFY);
+  flInstantResupplyTimeBetween = CreateConVar("sm_pt_instant_resupply_time_between", "0.5", "The number of seconds between each successful sm_pt_resupply.", FCVAR_NOTIFY);
+  cvNoSplashTime               = CreateConVar("sm_pt_no_splash_time", "0.25", "The number of seconds after the jack is thrown when it cannot be splashed.", FCVAR_NOTIFY);
+  // trikzEnable	 = CreateConVar("sm_pt_trikz", "0", "Set 'trikz' mode. 1 adds friendly knockback for airshots, 2 adds friendly knockback for splash damage, 3 adds friendly knockback for everywhere", FCVAR_NOTIFY, true, 0.0, true, 3.0);
+  // trikzProjCollide = CreateConVar("sm_pt_trikz_projcollide", "2", "Manually set team projectile collision behavior when trikz is on. 2 always collides, 1 will cause your projectiles to phase through if you are too close (default game behavior), 0 will cause them to never collide.", 0, true, 0.0, true, 2.0);
+  // trikzProjDev = CreateConVar("sm_pt_trikz_projcollide_dev", "0", "DONOTUSE; This command is used solely by the plugin to change values. Changing this manually may cause issues.", FCVAR_HIDDEN, true, 0.0, true, 2.0);
 
     // HookConVarChange(trikzEnable, Hook_OnTrikzChange);
     // HookConVarChange(trikzProjCollide, Hook_OnProjCollideChange);
@@ -294,6 +297,28 @@ public void OnLibraryAdded(const char[] name)
 #include "p4sstime/stats_print.sp"
 #include "p4sstime/f2stocks.sp"
 #include "p4sstime/spawnball.sp"
+
+public void AddNoSplash(int entity)
+{
+  SetVariantString("filter_no_splash");
+  if (AcceptEntityInput(entity, "SetDamageFilter", -1, -1, 0)) {
+    VerboseLog("successfully set damage filter for entity %d", entity);
+  } 
+  else {
+    VerboseLog("failed to set damage filter for entity %d", entity);
+  }
+}
+
+public void RemoveNoSplash(Handle timer, int entity)
+{
+  SetVariantString("");
+  if (AcceptEntityInput(entity, "SetDamageFilter", -1, -1, 0)){
+    VerboseLog("successfully reset damage filter for entity %d", entity);
+  } 
+  else {
+    VerboseLog("failed to reset damage filter %s for entity %d", entity);
+  }
+}
 
 public Action GoalHealTimer(Handle timer)
 {
@@ -786,6 +811,14 @@ void Hook_OnSpawnBall(const char[] name, int caller, int activator, float delay)
     bBallSplashed    = false;
 }
 
+float getNoSplashTime(){
+  char buffer[64];
+ 
+	cvNoSplashTime.GetString(buffer, 64);
+ 
+	return StringToFloat(buffer);
+}
+
 Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
 {
     bBallLoose       = true;
@@ -806,10 +839,13 @@ Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
         }
     }
 
-    if (!arrbPlyIsDead[owner])
-    {
-        eLastTickBallTeam = ownerTeam;
-    }
+  if (!arrbPlyIsDead[owner])
+  {
+    LogToGame("triggered AddNoSplash");
+    eLastTickBallTeam = ownerTeam;
+    AddNoSplash(eiJack);
+    CreateTimer(getNoSplashTime(), RemoveNoSplash, eiJack);
+  }
 
     arrbDeathbombCheck[eiDeathBomber] = false;    // if anyone at all throws the ball, the deathbomb is automatically false
 
