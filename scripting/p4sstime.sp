@@ -8,6 +8,7 @@
 #include <vector>
 #include <clientprefs>
 #include <sdktools_functions>
+#include <sdktools_entinput>
 
 #pragma semicolon 1  // required for logs.tf
 #pragma newdecls required
@@ -28,7 +29,7 @@ enum
   MAX_TEAMFORMAT_NAME_LENGTH = COLOR_FORMAT_LENGTH + MAX_NAME_LENGTH,
   MAX_ENTITIES               = 4096,
   GOALIE_DISTANCE            = 200,  // hu
-  GOAL_HEAL_HEIGHT           = 330   // hu
+  GOAL_HEAL_HEIGHT           = 330,  // hu
 }
 
 #define GOAL_HEAL_RADIUS     500.0                                  // hu
@@ -94,6 +95,7 @@ ConVar          bMedicArrowsNeutralizeBall;
 ConVar          bMedicArrowsPushBall;
 ConVar          bAllowInstantResupply;
 ConVar          flInstantResupplyTimeBetween;
+ConVar          cvNoSplashTime;
 ConVar          flGoalHeal;
 
 int             iPlyWhoGotJack;
@@ -211,6 +213,7 @@ public void OnPluginStart()
   bMedicArrowsPushBall         = CreateConVar("sm_pt_medic_splash_pushes_ball", "1", "If 1 along with sm_pt_medic_can_splash, allows medic crossbow arrows to push the ball", FCVAR_NOTIFY);
   flGoalHeal                   = CreateConVar("sm_pt_goal_heal", "0", "How much health the goal should heal per goal heal tick. There are two ticks per second.", FCVAR_NOTIFY);
   flInstantResupplyTimeBetween = CreateConVar("sm_pt_instant_resupply_time_between", "0.5", "The number of seconds between each successful sm_pt_resupply.", FCVAR_NOTIFY);
+  cvNoSplashTime               = CreateConVar("sm_pt_no_splash_time", "0.25", "The number of seconds after the jack is thrown when it cannot be splashed.", FCVAR_NOTIFY);
   // trikzEnable	 = CreateConVar("sm_pt_trikz", "0", "Set 'trikz' mode. 1 adds friendly knockback for airshots, 2 adds friendly knockback for splash damage, 3 adds friendly knockback for everywhere", FCVAR_NOTIFY, true, 0.0, true, 3.0);
   // trikzProjCollide = CreateConVar("sm_pt_trikz_projcollide", "2", "Manually set team projectile collision behavior when trikz is on. 2 always collides, 1 will cause your projectiles to phase through if you are too close (default game behavior), 0 will cause them to never collide.", 0, true, 0.0, true, 2.0);
   // trikzProjDev = CreateConVar("sm_pt_trikz_projcollide_dev", "0", "DONOTUSE; This command is used solely by the plugin to change values. Changing this manually may cause issues.", FCVAR_HIDDEN, true, 0.0, true, 2.0);
@@ -293,6 +296,28 @@ public void OnLibraryAdded(const char[] name)
 #include "p4sstime/stats_print.sp"
 #include "p4sstime/f2stocks.sp"
 #include "p4sstime/spawnball.sp"
+
+public void AddNoSplash(int entity)
+{
+  SetVariantString("filter_no_splash");
+  if (AcceptEntityInput(entity, "SetDamageFilter", -1, -1, 0)) {
+    VerboseLog("successfully set damage filter for entity %d", entity);
+  } 
+  else {
+    VerboseLog("failed to set damage filter for entity %d", entity);
+  }
+}
+
+public void RemoveNoSplash(Handle timer, int entity)
+{
+  SetVariantString("");
+  if (AcceptEntityInput(entity, "SetDamageFilter", -1, -1, 0)){
+    VerboseLog("successfully reset damage filter for entity %d", entity);
+  } 
+  else {
+    VerboseLog("failed to reset damage filter %s for entity %d", entity);
+  }
+}
 
 public Action GoalHealTimer(Handle timer)
 {
@@ -785,6 +810,14 @@ void Hook_OnSpawnBall(const char[] name, int caller, int activator, float delay)
   bBallSplashed    = false;
 }
 
+float getNoSplashTime(){
+  char buffer[64];
+ 
+	cvNoSplashTime.GetString(buffer, 64);
+ 
+	return StringToFloat(buffer);
+}
+
 Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
 {
   bBallLoose       = true;
@@ -807,7 +840,10 @@ Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
 
   if (!arrbPlyIsDead[owner])
   {
+    LogToGame("triggered AddNoSplash");
     eLastTickBallTeam = ownerTeam;
+    AddNoSplash(eiJack);
+    CreateTimer(getNoSplashTime(), RemoveNoSplash, eiJack);
   }
 
   arrbDeathbombCheck[eiDeathBomber] = false;  // if anyone at all throws the ball, the deathbomb is automatically false
