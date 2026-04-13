@@ -96,6 +96,7 @@ ConVar          bMedicArrowsPushBall;
 ConVar          bAllowInstantResupply;
 ConVar          flInstantResupplyTimeBetween;
 ConVar          cvNoSplashTime;
+ConVar          cvNoSplashRadius;
 ConVar          flGoalHeal;
 
 // int  			trikzProjCollideCurVal;
@@ -215,6 +216,7 @@ public void OnPluginStart()
   flGoalHeal                   = CreateConVar("sm_pt_goal_heal", "0", "How much health the goal should heal per goal heal tick. There are two ticks per second.", FCVAR_NOTIFY);
   flInstantResupplyTimeBetween = CreateConVar("sm_pt_instant_resupply_time_between", "0.5", "The number of seconds between each successful sm_pt_resupply.", FCVAR_NOTIFY);
   cvNoSplashTime               = CreateConVar("sm_pt_no_splash_time", "0.25", "The number of seconds after the jack is thrown when it cannot be splashed.", FCVAR_NOTIFY);
+  cvNoSplashRadius             = CreateConVar("sm_pt_no_splash_radius", "64.0", "The radius around the goal where nosplash will take effect.", FCVAR_NOTIFY);
   // trikzEnable	 = CreateConVar("sm_pt_trikz", "0", "Set 'trikz' mode. 1 adds friendly knockback for airshots, 2 adds friendly knockback for splash damage, 3 adds friendly knockback for everywhere", FCVAR_NOTIFY, true, 0.0, true, 3.0);
   // trikzProjCollide = CreateConVar("sm_pt_trikz_projcollide", "2", "Manually set team projectile collision behavior when trikz is on. 2 always collides, 1 will cause your projectiles to phase through if you are too close (default game behavior), 0 will cause them to never collide.", 0, true, 0.0, true, 2.0);
   // trikzProjDev = CreateConVar("sm_pt_trikz_projcollide_dev", "0", "DONOTUSE; This command is used solely by the plugin to change values. Changing this manually may cause issues.", FCVAR_HIDDEN, true, 0.0, true, 2.0);
@@ -819,6 +821,14 @@ float getNoSplashTime(){
 	return StringToFloat(buffer);
 }
 
+float getNoSplashRadius(){
+  char buffer[64];
+ 
+	cvNoSplashRadius.GetString(buffer, 64);
+ 
+	return StringToFloat(buffer);
+}
+
 Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
 {
     bBallLoose       = true;
@@ -840,11 +850,28 @@ Action Event_PassFree(Event event, const char[] name, bool dontBroadcast)
     }
 
   if (!arrbPlyIsDead[owner])
-  {
-    LogToGame("triggered AddNoSplash");
+  {  
     eLastTickBallTeam = ownerTeam;
-    AddNoSplash(eiJack);
-    CreateTimer(getNoSplashTime(), RemoveNoSplash, eiJack);
+
+    float ownerPos[3];
+    float goalPos[3];
+
+    GetClientAbsOrigin(owner, ownerPos);
+
+      if (ownerTeam == TFTeam_Blue)
+      {
+        goalPos = fRedGoalPos;
+      }
+      else if (ownerTeam == TFTeam_Red)
+      {
+        goalPos = fBluGoalPos;
+      }
+
+    if (FloatAbs(GetVectorDistance(ownerPos, goalPos)) <= getNoSplashRadius()){
+      LogToGame("triggered AddNoSplash");
+      AddNoSplash(eiJack);
+      CreateTimer(getNoSplashTime(), RemoveNoSplash, eiJack);
+    }
   }
 
     arrbDeathbombCheck[eiDeathBomber] = false;    // if anyone at all throws the ball, the deathbomb is automatically false
